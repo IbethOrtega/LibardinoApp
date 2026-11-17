@@ -1,0 +1,6 @@
+{
+  "name": "Libardino",
+  "description": "App de inventario, lectura de códigos de barras, dashboard y ventas para la tienda Libardino.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

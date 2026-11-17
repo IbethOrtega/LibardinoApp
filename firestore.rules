@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCategory(category) {
+      return category in ['CAMISAS', 'PANTALONES', 'VESTIDOS', 'CHAQUETAS', 'CALZADO', 'ACCESORIOS', 'OTROS'];
+    }
+
+    function isValidPaymentMethod(method) {
+      return method in ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'];
+    }
+
+    function isValidGarment(data) {
+      return data.userId is string &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.barcode is string && data.barcode.size() >= 1 && data.barcode.size() <= 64 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.category is string && isValidCategory(data.category) &&
+             data.size is string && data.size.size() >= 1 && data.size.size() <= 16 &&
+             data.color is string && data.color.size() <= 32 &&
+             data.costPrice is number && data.costPrice >= 0 && data.costPrice <= 1000000 &&
+             data.salePrice is number && data.salePrice >= 0 && data.salePrice <= 1000000 &&
+             data.stock is int && data.stock >= 0 && data.stock <= 1000000 &&
+             data.lowStockThreshold is int && data.lowStockThreshold >= 0 && data.lowStockThreshold <= 10000;
+    }
+
+    function isValidSale(data) {
+      return data.userId is string &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             isValidId(data.garmentId) &&
+             data.garmentName is string && data.garmentName.size() >= 1 && data.garmentName.size() <= 80 &&
+             data.barcode is string && data.barcode.size() >= 1 && data.barcode.size() <= 64 &&
+             data.size is string && data.size.size() >= 1 && data.size.size() <= 16 &&
+             data.quantity is int && data.quantity >= 1 && data.quantity <= 10000 &&
+             data.unitPrice is number && data.unitPrice >= 0 && data.unitPrice <= 1000000 &&
+             data.totalAmount is number && data.totalAmount >= 0 && data.totalAmount <= 10000000 &&
+             data.paymentMethod is string && isValidPaymentMethod(data.paymentMethod) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 120));
+    }
+
+    match /users/{userId}/garments/{garmentId} {
+      allow get: if isOwner(userId) && isValidId(garmentId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(garmentId) &&
+                       incoming().userId == userId &&
+                       incoming().keys().hasAll([
+                         'userId', 'barcode', 'name', 'category', 'size', 'color',
+                         'costPrice', 'salePrice', 'stock', 'lowStockThreshold',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'barcode', 'name', 'category', 'size', 'color',
+                         'costPrice', 'salePrice', 'stock', 'lowStockThreshold',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidGarment(incoming()) &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp &&
+                       incoming().updatedAt <= request.time;
+
+      allow update: if isOwner(userId) &&
+                       isValidId(garmentId) &&
+                       isValidGarment(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp &&
+                       incoming().updatedAt <= request.time &&
+                       (
+                         // Action: Edit full garment details or restock
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'barcode', 'name', 'category', 'size', 'color',
+                           'costPrice', 'salePrice', 'stock', 'lowStockThreshold', 'updatedAt'
+                         ]) ||
+                         // Action: Quick stock adjustment / sale decrement
+                         incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt'])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(garmentId);
+    }
+
+    match /users/{userId}/sales/{saleId} {
+      allow get: if isOwner(userId) && isValidId(saleId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(saleId) &&
+                       incoming().userId == userId &&
+                       incoming().keys().hasAll([
+                         'userId', 'garmentId', 'garmentName', 'barcode', 'size',
+                         'quantity', 'unitPrice', 'totalAmount', 'paymentMethod', 'createdAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'garmentId', 'garmentName', 'barcode', 'size',
+                         'quantity', 'unitPrice', 'totalAmount', 'paymentMethod', 'notes', 'createdAt'
+                       ]) &&
+                       isValidSale(incoming()) &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       exists(/databases/$(database)/documents/users/$(userId)/garments/$(incoming().garmentId));
+
+      allow update: if false;
+
+      allow delete: if isOwner(userId) && isValidId(saleId);
+    }
+  }
+}

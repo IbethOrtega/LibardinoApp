@@ -1,0 +1,151 @@
+{
+  "entities": {
+    "Garment": {
+      "title": "Garment",
+      "description": "A clothing item tracked in store inventory with barcode, size, price, and stock count.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated store owner UID."
+        },
+        "barcode": {
+          "type": "string",
+          "description": "Scanned or manual product barcode (EAN-13, UPC, Code 128, SKU)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Garment display name."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["CAMISAS", "PANTALONES", "VESTIDOS", "CHAQUETAS", "CALZADO", "ACCESORIOS", "OTROS"],
+          "description": "Clothing category."
+        },
+        "size": {
+          "type": "string",
+          "description": "Garment size label (XS, S, M, L, XL, 38, Unica, etc.)."
+        },
+        "color": {
+          "type": "string",
+          "description": "Garment color description."
+        },
+        "costPrice": {
+          "type": "number",
+          "description": "Wholesale purchase cost per unit."
+        },
+        "salePrice": {
+          "type": "number",
+          "description": "Retail sale price per unit."
+        },
+        "stock": {
+          "type": "integer",
+          "description": "Current available inventory units."
+        },
+        "lowStockThreshold": {
+          "type": "integer",
+          "description": "Threshold at or below which low-stock alert triggers."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on mutation."
+        }
+      },
+      "required": [
+        "userId",
+        "barcode",
+        "name",
+        "category",
+        "size",
+        "color",
+        "costPrice",
+        "salePrice",
+        "stock",
+        "lowStockThreshold",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "A recorded clothing sale line item linked to a garment in inventory.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated store owner UID."
+        },
+        "garmentId": {
+          "type": "string",
+          "description": "Document ID of the sold garment."
+        },
+        "garmentName": {
+          "type": "string",
+          "description": "Snapshot of the garment name at time of sale."
+        },
+        "barcode": {
+          "type": "string",
+          "description": "Snapshot of the garment barcode at time of sale."
+        },
+        "size": {
+          "type": "string",
+          "description": "Snapshot of the garment size at time of sale."
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Number of units sold."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "Unit sale price charged."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total amount for this sale entry."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["EFECTIVO", "TARJETA", "TRANSFERENCIA"],
+          "description": "Payment method used."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional sale note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on sale creation."
+        }
+      },
+      "required": [
+        "userId",
+        "garmentId",
+        "garmentName",
+        "barcode",
+        "size",
+        "quantity",
+        "unitPrice",
+        "totalAmount",
+        "paymentMethod",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/garments/{garmentId}": {
+      "schema": { "$ref": "#/entities/Garment" },
+      "description": "User-scoped clothing inventory garments."
+    },
+    "/users/{userId}/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "User-scoped clothing sales records."
+    }
+  }
+}
